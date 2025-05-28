@@ -10,20 +10,24 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Important for git pull
+          fetch-depth: 0
 
       - name: Set Git Identity
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@users.noreply.github.com"
 
-      - name: Add Executable Permissions
+      - name: Fetch and rebase from origin
+        run: |
+          git fetch origin
+          git rebase origin/main
+
+      - name: Add Executable Permissions and Push
         run: |
           find scripts/ -type f -name "*.sh" -exec chmod +x {} \;
           git add scripts/
-          git commit -m "Set +x permissions on all scripts" || echo "No changes to commit"
-          git pull origin main --rebase
-          git push origin main
+          git diff --cached --quiet || git commit -m "Set +x permissions on scripts"
+          git push origin HEAD:main
