@@ -12,3 +12,4 @@ kubectl logs --all-containers=true -n "$SERVICE_NAME" > "$DEST_DIR/logs.txt"
 # aws s3 cp "$DEST_DIR/logs.txt" "s3://your-backup-bucket/$SERVICE_NAME/logs.txt"
 
 echo "Logs archived at $DEST_DIR"
+
