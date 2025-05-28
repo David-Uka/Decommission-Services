@@ -13,16 +13,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Important to fetch full history for pull
+          fetch-depth: 0  # Important for git pull
 
-      - name: Setup Git
+      - name: Set Git Identity
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@users.noreply.github.com"
 
-      - name: Make all shell scripts executable
+      - name: Add Executable Permissions
         run: |
           find scripts/ -type f -name "*.sh" -exec chmod +x {} \;
-          git commit -am "Set executable permissions on scripts" || echo "No changes to commit"
-          git pull --rebase origin main
+          git add scripts/
+          git commit -m "Set +x permissions on all scripts" || echo "No changes to commit"
+          git pull origin main --rebase
           git push origin main
