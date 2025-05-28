@@ -81,4 +81,4 @@ jobs:
     needs: [k8s-cleanup, terraform-destroy]
     runs-on: ubuntu-latest
     steps:
-      - run: echo "✅ $SERVICE_NAME decommission complete."
+      - run: echo "$SERVICE_NAME decommission complete."
