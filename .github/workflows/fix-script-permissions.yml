@@ -6,6 +6,9 @@ on:
 jobs:
   make-executable:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -15,5 +18,5 @@ jobs:
           find scripts/ -type f -name "*.sh" -exec chmod +x {} \;
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@users.noreply.github.com"
-          git commit -am "Set executable permissions on scripts"
+          git commit -am "Set executable permissions on scripts" || echo "No changes to commit"
           git push
