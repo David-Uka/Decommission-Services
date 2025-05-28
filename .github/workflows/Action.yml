@@ -19,25 +19,21 @@ jobs:
       FORCE: ${{ github.event.inputs.force }}
 
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Validate Input
         run: |
           if [[ -z "$SERVICE_NAME" ]]; then
-            echo "SERVICE_NAME is required"
-            exit 1
+            echo "SERVICE_NAME is required" && exit 1
           fi
-          ./scripts/check_inventory.sh "$SERVICE_NAME"
+          bash scripts/check_inventory.sh "$SERVICE_NAME"
 
-      - name: Confirm Decommission (unless forced)
+      - name: Confirmation (skip if forced)
         if: ${{ env.FORCE != 'true' }}
         run: |
-          echo "::notice ::Manual confirmation required."
-          echo "FORCE=false. Rerun this workflow with force=true to proceed."
+          echo "Manual confirmation required. Rerun with force=true to proceed."
           exit 1
 
-  # Kubernetes cleanup job
   k8s-cleanup:
     needs: decommission
     runs-on: ubuntu-latest
@@ -47,24 +43,23 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Drain Traffic
-        run: ./scripts/drain_traffic.sh "$SERVICE_NAME"
+        run: bash scripts/drain_traffic.sh "$SERVICE_NAME"
 
       - name: Archive Logs
-        run: ./scripts/archive_logs.sh "$SERVICE_NAME"
+        run: bash scripts/archive_logs.sh "$SERVICE_NAME"
 
       - name: Snapshot DB
-        run: ./scripts/snapshot_db.sh "$SERVICE_NAME"
+        run: bash scripts/snapshot_db.sh "$SERVICE_NAME"
 
-      - name: Clean Service Registry
-        run: ./scripts/remove_from_service_registry.sh "$SERVICE_NAME"
+      - name: Clean Registry
+        run: bash scripts/remove_from_service_registry.sh "$SERVICE_NAME"
 
       - name: Clean DNS
-        run: ./scripts/remove_dns.sh "$SERVICE_NAME"
+        run: bash scripts/remove_dns.sh "$SERVICE_NAME"
 
-      - name: Remove Monitoring & Alerting
-        run: ./scripts/clean_monitoring.sh "$SERVICE_NAME"
+      - name: Clean Monitoring
+        run: bash scripts/clean_monitoring.sh "$SERVICE_NAME"
 
-  # Terraform cleanup job
   terraform-destroy:
     needs: decommission
     runs-on: ubuntu-latest
@@ -76,8 +71,14 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Terraform Init & Destroy
+      - name: Destroy Infrastructure
         run: |
           cd infra/services/$SERVICE_NAME
           terraform init -input=false
           terraform destroy -auto-approve
+
+  notify:
+    needs: [k8s-cleanup, terraform-destroy]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "✅ $SERVICE_NAME decommission complete."
