@@ -21,6 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Ensure check_inventory.sh is executable
+        run: chmod +x scripts/check_inventory.sh
+
       - name: Validate Input
         run: |
           if [[ -z "$SERVICE_NAME" ]]; then
@@ -41,6 +44,9 @@ jobs:
       SERVICE_NAME: ${{ github.event.inputs.service_name }}
     steps:
       - uses: actions/checkout@v3
+
+      - name: Ensure k8s scripts are executable
+        run: chmod +x scripts/*.sh
 
       - name: Drain Traffic
         run: bash scripts/drain_traffic.sh "$SERVICE_NAME"
