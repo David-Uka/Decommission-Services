@@ -1,3 +1,16 @@
+name: Decommission Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      service_name:
+        description: 'Name of the service to decommission'
+        required: true
+      force:
+        description: 'Force execution without manual confirmation'
+        required: false
+        default: 'false'
+
 jobs:
   decommission:
     runs-on: ubuntu-latest
@@ -7,9 +20,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
-      - name: Ensure scripts are executable
-        run: chmod +x scripts/*.sh
 
       - name: Validate Input
         run: |
@@ -31,9 +41,6 @@ jobs:
       SERVICE_NAME: ${{ github.event.inputs.service_name }}
     steps:
       - uses: actions/checkout@v3
-
-      - name: Ensure scripts are executable
-        run: chmod +x scripts/*.sh
 
       - name: Drain Traffic
         run: bash scripts/drain_traffic.sh "$SERVICE_NAME"
