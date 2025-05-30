@@ -29,7 +29,7 @@ jobs:
           if [[ -z "$SERVICE_NAME" ]]; then
             echo "SERVICE_NAME is required" && exit 1
           fi
-          bash scripts/check_inventory.sh "$SERVICE_NAME"
+          ./scripts/check_inventory.sh "$SERVICE_NAME"
 
       - name: Confirmation (skip if forced)
         if: ${{ env.FORCE != 'true' }}
@@ -45,26 +45,26 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Ensure k8s scripts are executable
+      - name: Ensure all scripts are executable
         run: chmod +x scripts/*.sh
 
       - name: Drain Traffic
-        run: bash scripts/drain_traffic.sh "$SERVICE_NAME"
+        run: ./scripts/drain_traffic.sh "$SERVICE_NAME"
 
       - name: Archive Logs
-        run: bash scripts/archive_logs.sh "$SERVICE_NAME"
+        run: ./scripts/archive_logs.sh "$SERVICE_NAME"
 
       - name: Snapshot DB
-        run: bash scripts/snapshot_db.sh "$SERVICE_NAME"
+        run: ./scripts/snapshot_db.sh "$SERVICE_NAME"
 
       - name: Clean Registry
-        run: bash scripts/remove_from_service_registry.sh "$SERVICE_NAME"
+        run: ./scripts/remove_from_service_registry.sh "$SERVICE_NAME"
 
       - name: Clean DNS
-        run: bash scripts/remove_dns.sh "$SERVICE_NAME"
+        run: ./scripts/remove_dns.sh "$SERVICE_NAME"
 
       - name: Clean Monitoring
-        run: bash scripts/clean_monitoring.sh "$SERVICE_NAME"
+        run: ./scripts/clean_monitoring.sh "$SERVICE_NAME"
 
   terraform-destroy:
     needs: decommission
