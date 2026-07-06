@@ -1,5 +1,12 @@
-- Decommissionh
-- aut
-- payments
-- notifications
-
+# Inventory of services this tool is allowed to decommission.
+# This file is the allow-list: `decommission run` refuses anything not
+# listed here, regardless of what's passed on the command line.
+- name: auth
+  owner: team-identity
+  tier: critical
+- name: payments
+  owner: team-payments
+  tier: critical
+- name: notifications
+  owner: team-comms
+  tier: standard

@@ -1,0 +1,74 @@
+name: Decommission Service
+
+# Manual-only, deliberately: this workflow deletes production traffic
+# routing, DNS, monitoring, and registry entries for a service. It is never
+# triggered by push/PR.
+on:
+  workflow_dispatch:
+    inputs:
+      service_name:
+        description: "Service name (must exist in services.yaml)"
+        required: true
+      confirm:
+        description: 'Type the service name again to confirm deletion'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Dry-run always happens first, with no approval needed — it's read-only
+  # (validates inventory, prints what *would* run, writes a simulated audit
+  # log) so anyone can sanity-check a request before asking for the real run.
+  dry-run:
+    runs-on: ubuntu-latest
+    outputs:
+      service: ${{ steps.check.outputs.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+
+      - name: Confirmation phrase must match service name
+        run: |
+          if [ "${{ github.event.inputs.service_name }}" != "${{ github.event.inputs.confirm }}" ]; then
+            echo "::error::confirm input must exactly match service_name"
+            exit 1
+          fi
+
+      - name: Validate + dry-run
+        id: check
+        run: |
+          decommission validate "${{ github.event.inputs.service_name }}"
+          decommission run "${{ github.event.inputs.service_name }}"
+          echo "service=${{ github.event.inputs.service_name }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dry-run-audit-log
+          path: audit.log
+
+  # Real execution is gated on the `production-decommission` GitHub
+  # Environment, which requires a manual reviewer approval in repo settings.
+  # This replaces the old `force=true` input, which was not an approval
+  # control — anyone with workflow_dispatch access could set it.
+  execute:
+    needs: dry-run
+    runs-on: ubuntu-latest
+    environment: production-decommission
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+
+      - name: Run decommission for real
+        run: decommission run "${{ needs.dry-run.outputs.service }}" --yes
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: execution-audit-log
+          path: audit.log
