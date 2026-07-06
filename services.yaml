@@ -1,5 +1,8 @@
-- Decommissionh
-- aut
-- payments
-- notifications
-
+# Inventory of services this repo is authorized to decommission.
+# check_inventory.sh refuses to proceed for any name not listed here —
+# this is the guardrail against fat-fingering a production service name
+# into the workflow_dispatch input.
+services:
+  - auth
+  - payments
+  - notifications

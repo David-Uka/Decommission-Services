@@ -1,52 +1,44 @@
 name: Decommission Service
 
+# Manually-triggered runbook that retires a service end-to-end:
+# inventory check -> traffic drain -> log archive -> DB snapshot ->
+# registry/DNS/monitoring cleanup -> infra teardown.
+#
+# Safety model:
+#   1. `check_inventory` refuses to run against any service not listed in
+#      services.yaml (typo/wrong-target guard).
+#   2. The `k8s-cleanup` and `terraform-destroy` jobs run under the
+#      `decommission-approval` GitHub Environment. Configure that
+#      environment in Settings > Environments with required reviewers —
+#      that's the real manual gate (a job condition can't provide one on
+#      its own, GitHub will pause the run for sign-off before these jobs
+#      execute).
 on:
   workflow_dispatch:
     inputs:
       service_name:
-        description: 'Name of the service to decommission'
+        description: 'Name of the service to decommission (must exist in services.yaml)'
         required: true
-      force:
-        description: 'Force execution without manual confirmation'
-        required: false
-        default: 'false'
 
 jobs:
-  decommission:
+  validate:
     runs-on: ubuntu-latest
     env:
       SERVICE_NAME: ${{ github.event.inputs.service_name }}
-      FORCE: ${{ github.event.inputs.force }}
-
     steps:
       - uses: actions/checkout@v3
 
-      - name: Ensure check_inventory.sh is executable
-        run: chmod +x scripts/check_inventory.sh
-
-      - name: Validate Input
-        run: |
-          if [[ -z "$SERVICE_NAME" ]]; then
-            echo "SERVICE_NAME is required" && exit 1
-          fi
-          ./scripts/check_inventory.sh "$SERVICE_NAME"
-
-      - name: Confirmation (skip if forced)
-        if: ${{ env.FORCE != 'true' }}
-        run: |
-          echo "Manual confirmation required. Rerun with force=true to proceed."
-          exit 1
+      - name: Validate service is in inventory
+        run: ./scripts/check_inventory.sh "$SERVICE_NAME"
 
   k8s-cleanup:
-    needs: decommission
+    needs: validate
     runs-on: ubuntu-latest
+    environment: decommission-approval
     env:
       SERVICE_NAME: ${{ github.event.inputs.service_name }}
     steps:
       - uses: actions/checkout@v3
-
-      - name: Ensure all scripts are executable
-        run: chmod +x scripts/*.sh
 
       - name: Drain Traffic
         run: ./scripts/drain_traffic.sh "$SERVICE_NAME"
@@ -67,19 +59,32 @@ jobs:
         run: ./scripts/clean_monitoring.sh "$SERVICE_NAME"
 
   terraform-destroy:
-    needs: decommission
+    needs: validate
     runs-on: ubuntu-latest
+    environment: decommission-approval
     env:
       SERVICE_NAME: ${{ github.event.inputs.service_name }}
     steps:
       - uses: actions/checkout@v3
 
+      - name: Check for per-service Terraform stack
+        id: check
+        run: |
+          if [[ -d "infra/services/$SERVICE_NAME" ]]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No infra/services/$SERVICE_NAME stack in this repo — skipping terraform destroy."
+          fi
+
       - name: Setup Terraform
+        if: steps.check.outputs.found == 'true'
         uses: hashicorp/setup-terraform@v3
 
       - name: Destroy Infrastructure
+        if: steps.check.outputs.found == 'true'
+        working-directory: infra/services/${{ github.event.inputs.service_name }}
         run: |
-          cd infra/services/$SERVICE_NAME
           terraform init -input=false
           terraform destroy -auto-approve
 
@@ -87,4 +92,4 @@ jobs:
     needs: [k8s-cleanup, terraform-destroy]
     runs-on: ubuntu-latest
     steps:
-      - run: echo "$SERVICE_NAME decommission complete."
+      - run: echo "${{ github.event.inputs.service_name }} decommission complete."
